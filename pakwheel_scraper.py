@@ -1,8 +1,10 @@
-import streamlit as st
+# pakwheel_scraper.py
+
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+import os
 import time
 
 BASE_URL = 'https://www.pakwheels.com'
@@ -14,29 +16,41 @@ def get_product_data():
     page = 1
 
     while True:
-        st.write(f"🔄 Scraping page {page}...")
+        print(f"Scraping page {page}...")
         url = START_URL + f"?page={page}"
         res = requests.get(url, headers=headers)
+        if res.status_code != 200:
+            print(f"Failed to fetch page {page}, status: {res.status_code}")
+            break
+
         soup = BeautifulSoup(res.content, "html.parser")
         product_divs = soup.find_all("div", class_="search-title-row")
 
         if not product_divs:
+            print("No more products found.")
             break
 
         for div in product_divs:
             try:
-                title = div.find("h3", style="white-space: normal;").text.strip()
+                title_tag = div.find("h3", style="white-space: normal;")
+                title = title_tag.text.strip() if title_tag else "N/A"
+
                 link_tag = div.find("a")
                 product_url = urljoin(BASE_URL, link_tag["href"]) if link_tag else "N/A"
-                price = div.find("div", class_="price-details").text.strip()
+
+                price_tag = div.find("div", class_="price-details")
+                price = price_tag.text.strip() if price_tag else "N/A"
+
                 img_tag = div.find("img", class_="lazy pic")
                 image_url = img_tag.get("data-original", "N/A") if img_tag else "N/A"
 
-                # Visit product page
+                # Scrape detail page
                 detail_res = requests.get(product_url, headers=headers)
                 detail_soup = BeautifulSoup(detail_res.content, "html.parser")
+
                 manufacturer_tag = detail_soup.find("h5", class_="nomargin")
                 manufacturer = manufacturer_tag.text.strip() if manufacturer_tag else "N/A"
+
                 detail_div = detail_soup.find("div", class_="primary-lang")
                 details = detail_div.get_text(separator="\n", strip=True) if detail_div else "N/A"
 
@@ -50,7 +64,7 @@ def get_product_data():
                 })
 
             except Exception as e:
-                st.write(f"Error on page {page}: {e}")
+                print(f"Error on product: {e}")
                 continue
 
         page += 1
@@ -58,18 +72,10 @@ def get_product_data():
 
     return pd.DataFrame(all_products)
 
-st.title("PakWheels Product Scraper")
+# Run and save to CSV
+if __name__ == "__main__":
+    df = get_product_data()
 
-st.markdown("""
-This tool scrapes product listings from PakWheels Accessories section (Karachi)  
-and collects product title, price, image, manufacturer, and details across all pages.
-""")
-
-if st.button("Scrape Entire Site"):
-    with st.spinner("Scraping all product pages..."):
-        df = get_product_data()
-        st.success(f"Scraped {len(df)} products.")
-        st.dataframe(df)
-
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download CSV", csv, "pakwheels_products.csv", "text/csv")
+    os.makedirs("data", exist_ok=True)
+    df.to_csv("data/pakwheels_products.csv", index=False)
+    print("✅ CSV saved to data/pakwheels_products.csv")
