@@ -1,20 +1,46 @@
-import pandas as pd
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
 import os
 import time
+import requests
+import pandas as pd
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+from pathlib import Path
 import concurrent.futures
 
+# ---------------------------
+# Config
+# ---------------------------
 BASE_URL = 'https://www.pakwheels.com'
 START_URL = 'https://www.pakwheels.com/accessories-spare-parts/search/-/ct_karachi/ct_lahore/ct_rawalpindi/ct_islamabad/'
-MAX_PAGES = 3  # Set to an integer to limit (e.g., 3)
+MAX_PAGES = 3  # Set None for full scrape
+HEADERS = {"User-Agent": "Mozilla/5.0"}
 
-headers = {"User-Agent": "Mozilla/5.0"}
+# ---------------------------
+# Image downloader
+# ---------------------------
+def download_image(image_url, title):
+    try:
+        Path("images").mkdir(parents=True, exist_ok=True)
+        safe_title = "".join(c if c.isalnum() else "_" for c in title)
+        filename = f"images/{safe_title}.jpg"
 
+        if image_url != "N/A":
+            img_data = requests.get(image_url, headers=HEADERS).content
+            with open(filename, 'wb') as f:
+                f.write(img_data)
+            return filename
+        else:
+            return "N/A"
+    except Exception as e:
+        print(f"❌ Image download failed for '{title}': {e}")
+        return "N/A"
+
+# ---------------------------
+# Product detail scraper
+# ---------------------------
 def scrape_detail(product_url):
     try:
-        detail_res = requests.get(product_url, headers=headers, timeout=10)
+        detail_res = requests.get(product_url, headers=HEADERS, timeout=10)
         detail_soup = BeautifulSoup(detail_res.content, "html.parser")
 
         manufacturer_tag = detail_soup.find("h5", class_="nomargin")
@@ -28,6 +54,9 @@ def scrape_detail(product_url):
         print(f"❌ Detail scrape error: {e}")
         return "N/A", "N/A"
 
+# ---------------------------
+# Main scraping loop
+# ---------------------------
 def get_product_data():
     all_products = []
     page = 1
@@ -39,7 +68,7 @@ def get_product_data():
 
         print(f"🔄 Scraping page {page}...")
         url = START_URL + f"?page={page}"
-        res = requests.get(url, headers=headers)
+        res = requests.get(url, headers=HEADERS)
 
         if res.status_code != 200:
             print(f"⚠️ Failed to load page {page}")
@@ -67,20 +96,21 @@ def get_product_data():
                 price_tag = div.find("div", class_="price-details")
                 price = price_tag.text.strip() if price_tag else "N/A"
 
-                img_tag = div.find("img", class_="lazy pic")
-                image_url = img_tag.get("data-original", "N/A") if img_tag else "N/A"
+                img_tag = div.find("img", class_="pic")
+                image_url = img_tag.get("src", "N/A") if img_tag else "N/A"
+                image_path = download_image(image_url, title)
 
                 page_products.append({
                     "title": title,
                     "url": product_url,
                     "price": price,
-                    "image": image_url
+                    "image": image_path  # ✅ local path to downloaded image
                 })
             except Exception as e:
                 print(f"❌ Listing parse error: {e}")
                 continue
 
-        # 🔄 Fetch detail pages in parallel (fast!)
+        # 🔄 Fetch detail pages in parallel
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             details = list(executor.map(scrape_detail, detail_urls))
 
@@ -90,10 +120,13 @@ def get_product_data():
 
         all_products.extend(page_products)
         page += 1
-        time.sleep(0.2)  # 🔽 reduced delay
+        time.sleep(0.2)
 
     return pd.DataFrame(all_products)
 
+# ---------------------------
+# Entry Point
+# ---------------------------
 if __name__ == "__main__":
     df = get_product_data()
     print(f"✅ Scraped {len(df)} products.")
