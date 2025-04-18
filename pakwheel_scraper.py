@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 import time
 
 BASE_URL = 'https://www.pakwheels.com'
-START_URL = 'https://www.pakwheels.com/accessories-spare-parts/search/-/ct_karachi/'
+START_URL = 'https://www.pakwheels.com/accessories-spare-parts/search/-/ct_karachi/ct_lahore/ct_rawalpindi/ct_islamabad/'
 
 def get_product_data():
     all_products = []
