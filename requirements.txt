@@ -1,0 +1,5 @@
+streamlit
+selenium
+pandas
+bs4
+webdriver-manager
