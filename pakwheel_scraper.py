@@ -1,6 +1,8 @@
+# streamlit_app.py
+import streamlit as st
+import pandas as pd
 import time
 import random
-import pandas as pd
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from selenium import webdriver
@@ -10,46 +12,39 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 BASE_URL = 'https://www.pakwheels.com'
 START_URL = 'https://www.pakwheels.com/accessories-spare-parts/search/-/ct_karachi/ct_lahore/ct_rawalpindi/ct_islamabad/'
-MAX_PAGES = None  # Set to None for all pages, or an integer like 3
-RESTART_BROWSER_EVERY = 100
+MAX_PAGES = 1  # Keep small for demo
 
+@st.cache_data(show_spinner=False)
 def create_driver():
     chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-gpu")
     chrome_options.page_load_strategy = 'eager'
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    return driver
 
-driver = create_driver()
-driver.maximize_window()
-
-def get_all_product_links():
-    global driver
+def get_product_links(driver, max_pages=1):
     current_page = 1
     all_products = []
 
     while True:
-        if MAX_PAGES and current_page > MAX_PAGES:
-            print("Reached max page limit.")
+        if max_pages and current_page > max_pages:
             break
 
-        print(f"Scraping page {current_page}...")
         paginated_url = START_URL + f'?page={current_page}'
-
         try:
             driver.get(paginated_url)
-        except Exception as e:
-            print(f"Timeout or error on page {current_page}: {e}")
+        except:
             current_page += 1
             continue
 
-        time.sleep(random.uniform(2, 4))
-
+        time.sleep(random.uniform(1.5, 2.5))
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         product_divs = soup.find_all('div', class_='search-title-row')
 
         if not product_divs:
-            print("No more products found.")
             break
 
         for div in product_divs:
@@ -70,56 +65,43 @@ def get_all_product_links():
                     'image': image_url
                 })
 
-                print(f"Added: {title}")
-
-            except Exception as e:
-                print(f"Error parsing product: {e}")
+            except:
                 continue
 
         current_page += 1
 
-        if RESTART_BROWSER_EVERY and current_page % RESTART_BROWSER_EVERY == 0:
-            print("Restarting browser to free memory...")
-            driver.quit()
-            driver = create_driver()
-            driver.maximize_window()
-
     return all_products
 
-def scrape_product_detail(url):
+def get_product_details(driver, url):
     try:
         driver.get(url)
-        time.sleep(random.uniform(1.5, 3))
+        time.sleep(random.uniform(1, 2))
         soup = BeautifulSoup(driver.page_source, 'html.parser')
-
         detail_div = soup.find('div', class_='primary-lang')
         product_details = detail_div.get_text(separator='\n', strip=True) if detail_div else 'N/A'
-
         manufacturer_tag = soup.find('h5', class_='nomargin')
         manufacturer = manufacturer_tag.text.strip() if manufacturer_tag else 'N/A'
-
         return product_details, manufacturer
-    except Exception as e:
-        print(f"Failed to scrape detail from {url}: {e}")
+    except:
         return 'N/A', 'N/A'
 
-def main():
-    all_products = get_all_product_links()
-    print(f"Total products found: {len(all_products)}")
+st.title("PakWheels Product Scraper")
 
-    for idx, product in enumerate(all_products):
-        print(f"Scraping detail ({idx+1}/{len(all_products)}): {product['title']}")
-        details, manufacturer = scrape_product_detail(product['url'])
-        product['details'] = details
-        product['manufacturer'] = manufacturer
+if st.button("Scrape Now"):
+    with st.spinner("Scraping in progress..."):
+        driver = create_driver()
+        products = get_product_links(driver, MAX_PAGES)
 
-    driver.quit()
+        for product in products:
+            details, manufacturer = get_product_details(driver, product['url'])
+            product['details'] = details
+            product['manufacturer'] = manufacturer
 
-    df = pd.DataFrame(all_products)
-    df.to_csv('pakwheels_products.csv', index=False)
-    print("Saved as pakwheels_products.csv")
-    print("Data Preview:")
-    print(df.head())
+        driver.quit()
+        df = pd.DataFrame(products)
+        st.success("Scraping complete!")
+        st.dataframe(df)
 
-if __name__ == "__main__":
-    main()
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("Download CSV", csv, "pakwheels_products.csv", "text/csv")
+
