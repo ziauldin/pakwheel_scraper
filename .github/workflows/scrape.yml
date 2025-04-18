@@ -1,7 +1,7 @@
 name: One-Time PakWheels Scraper
 
 on:
-  workflow_dispatch:  # 🔘 Manual trigger (via Run workflow button)
+  workflow_dispatch:  # ▶️ Manual run via Actions tab
 
 jobs:
   scrape:
@@ -14,7 +14,7 @@ jobs:
       - name: 🐍 Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.10
+          python-version: '3.10'  # ✅ Use valid version in quotes
 
       - name: 📦 Install Dependencies
         run: |
@@ -23,16 +23,18 @@ jobs:
 
       - name: 🧹 Run Scraper Script
         run: |
+          echo "Running pakwheel_scraper.py..."
           python pakwheel_scraper.py
 
       - name: 🔍 Preview Output
+        continue-on-error: true
         run: |
           echo "--- Data Folder ---"
-          ls -l data || echo "No data folder found"
+          ls -lh data || echo "❌ No data folder found"
           echo "--- Images Folder ---"
-          ls -l images || echo "No images folder found"
-          echo "--- Sample CSV ---"
-          head -n 10 data/pakwheels_products.csv || echo "No CSV found"
+          ls -lh images || echo "❌ No images folder found"
+          echo "--- Sample CSV Output ---"
+          head -n 10 data/pakwheels_products.csv || echo "❌ CSV not found"
 
       - name: ✅ Commit & Push Scraped Files
         env:
@@ -46,6 +48,7 @@ jobs:
           touch data/.keep images/.keep
 
           git add data/ images/
+
           git fetch --unshallow || true
           git pull --rebase origin main || true
           git commit -m "📦 Auto scrape: CSV + images added" || echo "No changes to commit"
