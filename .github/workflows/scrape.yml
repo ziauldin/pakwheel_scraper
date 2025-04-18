@@ -24,10 +24,12 @@ jobs:
       - name: 🧹 Run the Scraper Script
         run: python pakwheel_scraper.py
 
-      - name: 📤 Commit & Push CSV Output
+      - name: Commit & Push CSV Output
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add data/pakwheels_products.csv
-          git commit -m "📦 Auto scrape: CSV generated"
+          git commit -m "📦 Auto scrape: CSV generated" || echo "No changes to commit"
           git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
