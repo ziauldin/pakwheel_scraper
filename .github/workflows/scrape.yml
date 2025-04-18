@@ -24,23 +24,16 @@ jobs:
       - name: 🧹 Run the Scraper Script
         run: python pakwheel_scraper.py
 
-      - name: Commit & Push CSV Output
+      - name: ✅ Commit & Push CSV Output
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-
-          # Set remote with access token
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
 
-          # ✅ Add file first (prevents untracked file error)
-          git add data/pakwheels_products.csv
-
-          # ✅ Fetch full history + pull safely
+          git add data/
           git fetch --unshallow || true
           git pull --rebase origin main || true
-
-          # ✅ Commit only if there are actual changes
           git commit -m "📦 Auto scrape: CSV generated" || echo "No changes to commit"
           git push origin HEAD:${{ github.ref }}
