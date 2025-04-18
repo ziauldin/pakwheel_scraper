@@ -12,21 +12,26 @@ import concurrent.futures
 # --------------------------
 BASE_URL = 'https://www.pakwheels.com'
 START_URL = 'https://www.pakwheels.com/accessories-spare-parts/search/-/ct_karachi/ct_lahore/ct_rawalpindi/ct_islamabad/'
-MAX_PAGES = 3  # Set an integer to limit pages (e.g., 3)
+MAX_PAGES = 3  # Set an integer (e.g. 3) to limit pages for testing
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 # --------------------------
-# Image Downloader
+# Ensure output folders exist
+# --------------------------
+Path("data").mkdir(parents=True, exist_ok=True)
+Path("images").mkdir(parents=True, exist_ok=True)
+
+# --------------------------
+# Download image to /images/
 # --------------------------
 def download_image(image_url, title):
     try:
-        Path("images").mkdir(parents=True, exist_ok=True)
         safe_title = "".join(c if c.isalnum() else "_" for c in title)[:50]
         ext = image_url.split('.')[-1].split('?')[0]
         filename = f"images/{safe_title}.{ext}"
 
         if image_url != "N/A":
-            img_data = requests.get(image_url, headers=HEADERS).content
+            img_data = requests.get(image_url, headers=HEADERS, timeout=10).content
             with open(filename, 'wb') as f:
                 f.write(img_data)
             return filename
@@ -37,7 +42,7 @@ def download_image(image_url, title):
         return "N/A"
 
 # --------------------------
-# Product Details Scraper
+# Scrape product detail page
 # --------------------------
 def scrape_detail(product_url):
     try:
@@ -52,11 +57,11 @@ def scrape_detail(product_url):
 
         return manufacturer, details
     except Exception as e:
-        print(f"❌ Error in product details: {e}")
+        print(f"❌ Detail scrape failed for {product_url}: {e}")
         return "N/A", "N/A"
 
 # --------------------------
-# Main Scraper Function
+# Scrape all products
 # --------------------------
 def get_product_data():
     all_products = []
@@ -64,7 +69,7 @@ def get_product_data():
 
     while True:
         if MAX_PAGES and page > MAX_PAGES:
-            print(f"Reached max page limit: {MAX_PAGES}")
+            print(f"✅ Reached max page limit: {MAX_PAGES}")
             break
 
         print(f"🔄 Scraping page {page}...")
@@ -72,14 +77,14 @@ def get_product_data():
         res = requests.get(url, headers=HEADERS)
 
         if res.status_code != 200:
-            print(f"⚠️ Failed to load page {page}")
+            print(f"⚠️ Failed to load page {page}, status code: {res.status_code}")
             break
 
         soup = BeautifulSoup(res.content, "html.parser")
         product_divs = soup.find_all("div", class_="search-title-row")
 
         if not product_divs:
-            print("✅ No more products.")
+            print("✅ No more products found.")
             break
 
         page_products = []
@@ -108,10 +113,10 @@ def get_product_data():
                     "image": image_path
                 })
             except Exception as e:
-                print(f"❌ Listing error: {e}")
+                print(f"❌ Error scraping listing: {e}")
                 continue
 
-        # 🔄 Parallel fetch product details
+        # Scrape detail pages in parallel
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             details = list(executor.map(scrape_detail, detail_urls))
 
@@ -121,20 +126,20 @@ def get_product_data():
 
         all_products.extend(page_products)
         page += 1
-        time.sleep(0.2)  # prevent hammering
+        time.sleep(0.2)
 
     return pd.DataFrame(all_products)
 
 # --------------------------
-# Entry Point
+# Main entry point
 # --------------------------
 if __name__ == "__main__":
     df = get_product_data()
     print(f"✅ Scraped {len(df)} products.")
-    
+
     if not df.empty:
-        os.makedirs("data", exist_ok=True)
-        df.to_csv("data/pakwheels_products.csv", index=False)
-        print("💾 Saved: data/pakwheels_products.csv")
+        output_path = "data/pakwheels_products.csv"
+        df.to_csv(output_path, index=False)
+        print(f"💾 CSV saved to {output_path}")
     else:
-        print("⚠️ No data scraped.")
+        print("⚠️ No data to save.")
