@@ -10,15 +10,22 @@ import time
 BASE_URL = 'https://www.pakwheels.com'
 START_URL = 'https://www.pakwheels.com/accessories-spare-parts/search/-/ct_karachi/ct_lahore/ct_rawalpindi/ct_islamabad/'
 
+MAX_PAGES = 1  # 👈 Limit scraping to first 3 pages (set to None to scrape all)
+
 def get_product_data():
     all_products = []
     headers = {"User-Agent": "Mozilla/5.0"}
     page = 1
 
     while True:
+        if MAX_PAGES and page > MAX_PAGES:
+            print(f"Reached max page limit: {MAX_PAGES}")
+            break
+
         print(f"Scraping page {page}...")
         url = START_URL + f"?page={page}"
         res = requests.get(url, headers=headers)
+
         if res.status_code != 200:
             print(f"Failed to fetch page {page}, status: {res.status_code}")
             break
@@ -44,7 +51,7 @@ def get_product_data():
                 img_tag = div.find("img", class_="lazy pic")
                 image_url = img_tag.get("data-original", "N/A") if img_tag else "N/A"
 
-                # Scrape detail page
+                # Detail page
                 detail_res = requests.get(product_url, headers=headers)
                 detail_soup = BeautifulSoup(detail_res.content, "html.parser")
 
@@ -75,7 +82,7 @@ def get_product_data():
 # Run and save to CSV
 if __name__ == "__main__":
     df = get_product_data()
-
+    print(f"✅ Scraped {len(df)} products in total.")
     os.makedirs("data", exist_ok=True)
     df.to_csv("data/pakwheels_products.csv", index=False)
-    print("✅ CSV saved to data/pakwheels_products.csv")
+    print("📁 CSV saved to data/pakwheels_products.csv")
