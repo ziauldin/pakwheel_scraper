@@ -1,7 +1,7 @@
 name: One-Time PakWheels Scraper
 
 on:
-  workflow_dispatch:  # Manual run only
+  workflow_dispatch:  # 🔘 Manual trigger (via Run workflow button)
 
 jobs:
   scrape:
@@ -14,17 +14,27 @@ jobs:
       - name: 🐍 Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: 3.10
 
-      - name: 📦 Install Python Dependencies
+      - name: 📦 Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 🧹 Run the Scraper Script
-        run: python pakwheel_scraper.py
+      - name: 🧹 Run Scraper Script
+        run: |
+          python pakwheel_scraper.py
 
-            - name: ✅ Commit & Push Scraped Files
+      - name: 🔍 Preview Output
+        run: |
+          echo "--- Data Folder ---"
+          ls -l data || echo "No data folder found"
+          echo "--- Images Folder ---"
+          ls -l images || echo "No images folder found"
+          echo "--- Sample CSV ---"
+          head -n 10 data/pakwheels_products.csv || echo "No CSV found"
+
+      - name: ✅ Commit & Push Scraped Files
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -32,17 +42,11 @@ jobs:
           git config user.email "github-actions@github.com"
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
 
-          # Ensure both folders exist
           mkdir -p data images
           touch data/.keep images/.keep
 
-          # Add all scraped content
           git add data/ images/
-
           git fetch --unshallow || true
           git pull --rebase origin main || true
-          git commit -m "📦 Auto scrape: CSV + images updated" || echo "No changes to commit"
-          git push origin HEAD:${{ github.ref }}
-in || true
-          git commit -m "📦 Auto scrape: CSV generated" || echo "No changes to commit"
+          git commit -m "📦 Auto scrape: CSV + images added" || echo "No changes to commit"
           git push origin HEAD:${{ github.ref }}
