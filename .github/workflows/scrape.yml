@@ -31,16 +31,16 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          # Update remote URL to include token
+          # Set remote with access token
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
 
-          # Pull full history first to allow rebase
+          # ✅ Add file first (prevents untracked file error)
+          git add data/pakwheels_products.csv
+
+          # ✅ Fetch full history + pull safely
           git fetch --unshallow || true
           git pull --rebase origin main || true
 
-          # Stage + commit
-          git add data/pakwheels_products.csv
+          # ✅ Commit only if there are actual changes
           git commit -m "📦 Auto scrape: CSV generated" || echo "No changes to commit"
-
-          # Push back
           git push origin HEAD:${{ github.ref }}
