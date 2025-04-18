@@ -7,22 +7,23 @@ from urllib.parse import urljoin
 from pathlib import Path
 import concurrent.futures
 
-# ---------------------------
+# --------------------------
 # Config
-# ---------------------------
+# --------------------------
 BASE_URL = 'https://www.pakwheels.com'
 START_URL = 'https://www.pakwheels.com/accessories-spare-parts/search/-/ct_karachi/ct_lahore/ct_rawalpindi/ct_islamabad/'
-MAX_PAGES = 3  # Set None for full scrape
+MAX_PAGES = 3  # Set an integer to limit pages (e.g., 3)
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
-# ---------------------------
-# Image downloader
-# ---------------------------
+# --------------------------
+# Image Downloader
+# --------------------------
 def download_image(image_url, title):
     try:
         Path("images").mkdir(parents=True, exist_ok=True)
-        safe_title = "".join(c if c.isalnum() else "_" for c in title)
-        filename = f"images/{safe_title}.jpg"
+        safe_title = "".join(c if c.isalnum() else "_" for c in title)[:50]
+        ext = image_url.split('.')[-1].split('?')[0]
+        filename = f"images/{safe_title}.{ext}"
 
         if image_url != "N/A":
             img_data = requests.get(image_url, headers=HEADERS).content
@@ -32,12 +33,12 @@ def download_image(image_url, title):
         else:
             return "N/A"
     except Exception as e:
-        print(f"❌ Image download failed for '{title}': {e}")
+        print(f"❌ Failed to download image for '{title}': {e}")
         return "N/A"
 
-# ---------------------------
-# Product detail scraper
-# ---------------------------
+# --------------------------
+# Product Details Scraper
+# --------------------------
 def scrape_detail(product_url):
     try:
         detail_res = requests.get(product_url, headers=HEADERS, timeout=10)
@@ -51,12 +52,12 @@ def scrape_detail(product_url):
 
         return manufacturer, details
     except Exception as e:
-        print(f"❌ Detail scrape error: {e}")
+        print(f"❌ Error in product details: {e}")
         return "N/A", "N/A"
 
-# ---------------------------
-# Main scraping loop
-# ---------------------------
+# --------------------------
+# Main Scraper Function
+# --------------------------
 def get_product_data():
     all_products = []
     page = 1
@@ -104,13 +105,13 @@ def get_product_data():
                     "title": title,
                     "url": product_url,
                     "price": price,
-                    "image": image_path  # ✅ local path to downloaded image
+                    "image": image_path
                 })
             except Exception as e:
-                print(f"❌ Listing parse error: {e}")
+                print(f"❌ Listing error: {e}")
                 continue
 
-        # 🔄 Fetch detail pages in parallel
+        # 🔄 Parallel fetch product details
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             details = list(executor.map(scrape_detail, detail_urls))
 
@@ -120,16 +121,20 @@ def get_product_data():
 
         all_products.extend(page_products)
         page += 1
-        time.sleep(0.2)
+        time.sleep(0.2)  # prevent hammering
 
     return pd.DataFrame(all_products)
 
-# ---------------------------
+# --------------------------
 # Entry Point
-# ---------------------------
+# --------------------------
 if __name__ == "__main__":
     df = get_product_data()
     print(f"✅ Scraped {len(df)} products.")
-    os.makedirs("data", exist_ok=True)
-    df.to_csv("data/pakwheels_products.csv", index=False)
-    print("💾 Saved: data/pakwheels_products.csv")
+    
+    if not df.empty:
+        os.makedirs("data", exist_ok=True)
+        df.to_csv("data/pakwheels_products.csv", index=False)
+        print("💾 Saved: data/pakwheels_products.csv")
+    else:
+        print("⚠️ No data scraped.")
