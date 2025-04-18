@@ -24,7 +24,7 @@ jobs:
       - name: 🧹 Run the Scraper Script
         run: python pakwheel_scraper.py
 
-      - name: ✅ Commit & Push CSV Output
+            - name: ✅ Commit & Push Scraped Files
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -32,8 +32,17 @@ jobs:
           git config user.email "github-actions@github.com"
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
 
-          git add data/
+          # Ensure both folders exist
+          mkdir -p data images
+          touch data/.keep images/.keep
+
+          # Add all scraped content
+          git add data/ images/
+
           git fetch --unshallow || true
           git pull --rebase origin main || true
+          git commit -m "📦 Auto scrape: CSV + images updated" || echo "No changes to commit"
+          git push origin HEAD:${{ github.ref }}
+in || true
           git commit -m "📦 Auto scrape: CSV generated" || echo "No changes to commit"
           git push origin HEAD:${{ github.ref }}
