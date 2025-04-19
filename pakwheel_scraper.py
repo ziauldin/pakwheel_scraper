@@ -12,7 +12,7 @@ import concurrent.futures
 # --------------------------
 BASE_URL = 'https://www.pakwheels.com'
 START_URL = 'https://www.pakwheels.com/accessories-spare-parts/search/-/ct_karachi/ct_lahore/ct_rawalpindi/ct_islamabad/'
-MAX_PAGES = 3  # Set an integer (e.g. 3) to limit pages for testing
+MAX_PAGES = None  # Set an integer (e.g. 3) to limit pages for testing
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 # --------------------------
